@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Batch Audio Upload</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 2rem;
+      background-color: #f4f4f4;
+    }
+    h1 {
+      color: #333;
+    }
+    #status {
+      margin-top: 1rem;
+      color: green;
+    }
+    button {
+      margin-top: 1rem;
+      padding: 0.5rem 1rem;
+      background-color: #007BFF;
+      color: white;
+      border: none;
+      cursor: pointer;
+      font-size: 1rem;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+  </style>
+</head>
+<body>
+  <h1>Upload a Folder of Audio Files</h1>
+
+  <input type="file" id="folderInput" webkitdirectory directory multiple />
+  <br />
+  <button id="uploadBtn">Process Audios</button>
+
+  <div id="status"></div>
+
+  <script>
+    const folderInput = document.getElementById('folderInput');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const status = document.getElementById('status');
+
+    uploadBtn.addEventListener('click', async () => {
+      const files = folderInput.files;
+      if (files.length === 0) {
+        status.innerText = 'Please select a folder.';
+        status.style.color = 'red';
+        return;
+      }
+
+      const formData = new FormData();
+      for (const file of files) {
+        formData.append('audios', file);
+      }
+
+      status.innerText = 'Uploading and processing...';
+      status.style.color = 'black';
+
+      try {
+        const res = await fetch('http://127.0.0.1:5000/process_folder', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!res.ok) {
+          throw new Error('Request failed');
+        }
+
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'results.csv';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        status.innerText = 'Processing complete. CSV downloaded.';
+        status.style.color = 'green';
+      } catch (error) {
+        console.error('Error:', error);
+        status.innerText = 'An error occurred while processing.';
+        status.style.color = 'red';
+      }
+    });
+  </script>
+</body>
+</html>
