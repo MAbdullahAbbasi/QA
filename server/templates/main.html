@@ -67,7 +67,7 @@
       resultsContainer.style.display = 'none';  // hide previous results
 
       try {
-        const res = await fetch('http://127.0.0.1:5000/process_folder', {
+        const res = await fetch('/process_folder', {
           method: 'POST',
           body: formData,
         });
