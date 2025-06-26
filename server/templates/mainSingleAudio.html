@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Upload Audio</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f4f6f9;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+    }
+
+    h1 {
+      color: #333;
+      margin-bottom: 20px;
+    }
+
+    input[type="file"] {
+      padding: 10px;
+      font-size: 16px;
+    }
+
+    button {
+      margin-top: 20px;
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+      display: none;
+    }
+
+    #answers {
+      margin-top: 20px;
+      padding: 15px;
+      background-color: #fff;
+      border: 1px solid #ddd;
+      max-width: 500px;
+      text-align: left;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <h1>Assure the Quality of Your Call</h1>
+  <hr />
+
+  <h3>Choose an audio</h3>
+  <input type="file" name="audio" accept="audio/*" id="audioInput" required />
+  <br />
+  <button id="submitBtn">Submit</button>
+
+  <hr />
+
+  <div id="answers"></div>
+
+  <div>
+    <h1>Questions to be followed</h1>
+    <p>Do you have an automobile?</p>
+    <p>How many miles on it?</p>
+    <p>What's the year, make and model of your car?</p>
+  </div>
+
+  <script>
+    const audioInput = document.getElementById('audioInput');
+    const submitBtn = document.getElementById('submitBtn');
+    const answersDiv = document.getElementById('answers');
+
+    audioInput.addEventListener('change', () => {
+      submitBtn.style.display = audioInput.files.length > 0 ? 'inline-block' : 'none';
+    });
+
+    submitBtn.addEventListener('click', async (e) => {
+      e.preventDefault(); // Prevent default form submission
+
+      const file = audioInput.files[0];
+      if (!file) {
+        answersDiv.innerText = "Please select a file.";
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('audio', file);
+
+      answersDiv.innerText = "Uploading and processing...";
+
+      try {
+        const response = await fetch('http://127.0.0.1:5000/receive_audio', {
+          method: 'POST',
+          body: formData,
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          answersDiv.innerText = data.filtered_answers || "No answers found.";
+        } else {
+          answersDiv.innerText = `Error: ${data.error || 'Unknown error occurred.'}`;
+        }
+      } catch (err) {
+        answersDiv.innerText = `Request failed: ${err.message}`;
+      }
+    });
+  </script>
+</body>
+</html>
