@@ -7,6 +7,8 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet" />
 </head>
 <body>
+
+
   <div class="container my-4">
     <h1 class="text-center display-4 mb-4" style="text-shadow: 0px 4px 6px rgba(255, 0, 191, 0.5);">cTech QA Model</h1>
     <h3 class="text-center display-16 mb-4" style="font-weight: lighter;">Test the quality of your call with us</h3>
@@ -18,7 +20,6 @@
       <button id="showFolderUpload" class="btn btn-outline-primary me-2">Upload Folder</button>
       <button id="showFileUpload" class="btn btn-outline-secondary">Upload Files</button>
     </div>
-
 
 
     <!-- Folder Upload Section -->
@@ -43,7 +44,9 @@
       </div>
     </div>
 
-    <div id="status" class="mb-3"></div>
+    
+
+    <div id="status" class=""></div>
 
     <!-- Results Section -->
     <div id="resultsContainer" style="display:none;">
@@ -56,126 +59,150 @@
       </div>
       <button id="downloadBtn" class="btn btn-success">Download Excel File</button>
     </div>
+
+     <!-- Default Idle GIF -->
+    <div class="text-center mb-3">
+  <img id="idleGif" src="{{ url_for('static', filename='images/qabackimage.gif') }}" alt="Idle" style="height: 300px;" />
+  <img id="loadingGif" src="{{ url_for('static', filename='images/loadingimg.gif') }}" alt="Loading" style="height: 250px; display: none;" />
+    </div>
+
   </div>
 
-  <script>
-    const folderSection = document.getElementById('folderSection');
-    const fileSection = document.getElementById('fileSection');
-    const showFolderUpload = document.getElementById('showFolderUpload');
-    const showFileUpload = document.getElementById('showFileUpload');
+<script>
+  const folderSection = document.getElementById('folderSection');
+  const fileSection = document.getElementById('fileSection');
+  const showFolderUpload = document.getElementById('showFolderUpload');
+  const showFileUpload = document.getElementById('showFileUpload');
 
-    const folderInput = document.getElementById('folderInput');
-    const fileInput = document.getElementById('fileInput');
-    const uploadFolderBtn = document.getElementById('uploadFolderBtn');
-    const uploadFileBtn = document.getElementById('uploadFileBtn');
+  const folderInput = document.getElementById('folderInput');
+  const fileInput = document.getElementById('fileInput');
+  const uploadFolderBtn = document.getElementById('uploadFolderBtn');
+  const uploadFileBtn = document.getElementById('uploadFileBtn');
 
-    const status = document.getElementById('status');
-    const resultsContainer = document.getElementById('resultsContainer');
-    const tableHead = document.getElementById('tableHead');
-    const tableBody = document.getElementById('tableBody');
-    const downloadBtn = document.getElementById('downloadBtn');
+  const status = document.getElementById('status');
+  const resultsContainer = document.getElementById('resultsContainer');
+  const tableHead = document.getElementById('tableHead');
+  const tableBody = document.getElementById('tableBody');
+  const downloadBtn = document.getElementById('downloadBtn');
 
-    // Toggle views
-    showFolderUpload.addEventListener('click', () => {
-      folderSection.style.display = 'block';
-      fileSection.style.display = 'none';
-      resultsContainer.style.display = 'none';
-      status.innerText = '';
-    });
+  // New GIF references
+  const idleGif = document.getElementById('idleGif');
+  const loadingGif = document.getElementById('loadingGif');
 
-    showFileUpload.addEventListener('click', () => {
-      folderSection.style.display = 'none';
-      fileSection.style.display = 'block';
-      resultsContainer.style.display = 'none';
-      status.innerText = '';
-    });
+  // Toggle views
+  showFolderUpload.addEventListener('click', () => {
+    folderSection.style.display = 'block';
+    fileSection.style.display = 'none';
+    resultsContainer.style.display = 'none';
+    status.innerText = '';
+    idleGif.style.display = 'inline';
+    loadingGif.style.display = 'none';
+  });
 
-    // Handle folder upload
-    uploadFolderBtn.addEventListener('click', async () => {
-      await handleUpload(folderInput.files, '/process_folder');
-    });
+  showFileUpload.addEventListener('click', () => {
+    folderSection.style.display = 'none';
+    fileSection.style.display = 'block';
+    resultsContainer.style.display = 'none';
+    status.innerText = '';
+    idleGif.style.display = 'none';
+    loadingGif.style.display = 'none';
+  });
 
-    // Handle file upload
-    uploadFileBtn.addEventListener('click', async () => {
-      await handleUpload(fileInput.files, '/process_files');
-    });
+  // Handle folder upload
+  uploadFolderBtn.addEventListener('click', async () => {
+    await handleUpload(folderInput.files, '/process_folder');
+  });
 
-    // Common handler
-    async function handleUpload(files, endpoint) {
-      if (files.length === 0) {
-        status.innerText = 'Please select files.';
-        status.style.color = 'red';
-        return;
-      }
+  // Handle file upload
+  uploadFileBtn.addEventListener('click', async () => {
+    await handleUpload(fileInput.files, '/process_files');
+  });
 
-      const formData = new FormData();
-      for (const file of files) {
-        formData.append('audios', file);
-      }
-
-      status.innerText = 'Uploading and processing...';
-      status.style.color = 'black';
-      resultsContainer.style.display = 'none';
-
-      try {
-        const res = await fetch(endpoint, {
-          method: 'POST',
-          body: formData,
-        });
-
-        if (!res.ok) throw new Error('Request failed');
-
-        const data = await res.json();
-
-        // Show table
-        tableHead.innerHTML = '';
-        const headerRow = document.createElement('tr');
-        data.headers.forEach(header => {
-          const th = document.createElement('th');
-          th.textContent = header;
-          headerRow.appendChild(th);
-        });
-        tableHead.appendChild(headerRow);
-
-        tableBody.innerHTML = '';
-        const qualStatusIndex = data.headers.findIndex(h =>
-          h.toLowerCase().includes('qualification status') || h.toLowerCase().includes('qualified status')
-        );
-
-        data.rows.forEach(row => {
-          const tr = document.createElement('tr');
-          row.forEach((cell, index) => {
-            const td = document.createElement('td');
-            td.textContent = cell;
-
-            if (index === qualStatusIndex) {
-              const cellText = cell.toLowerCase();
-              if (cellText.includes('qualified') && !cellText.includes('not')) {
-                td.style.backgroundColor = '#c6efce';
-                td.style.color = '#006100';
-              } else if (cellText.includes('not qualified')) {
-                td.style.backgroundColor = '#ffc7ce';
-                td.style.color = '#9c0006';
-              }
-            }
-            tr.appendChild(td);
-          });
-          tableBody.appendChild(tr);
-        });
-
-        resultsContainer.style.display = 'block';
-        downloadBtn.onclick = () => {
-          window.open('http://127.0.0.1:5000' + data.excel_download_url, '_blank');
-        };
-
-        status.innerText = 'Processing complete. Results shown below.';
-        status.style.color = 'green';
-      } catch (error) {
-        console.error('Error:', error);
-        status.innerText = 'An error occurred while processing.';
-        status.style.color = 'red';
-      }
+  // Common handler
+  async function handleUpload(files, endpoint) {
+    if (files.length === 0) {
+      status.innerText = 'Please select files.';
+      status.style.color = 'red';
+      return;
     }
-  </script>
+
+    const formData = new FormData();
+    for (const file of files) {
+      formData.append('audios', file);
+    }
+
+    // Show loading, hide idle
+    idleGif.style.display = 'none';
+    loadingGif.style.display = 'inline';
+
+    status.innerText = 'Uploading and processing...';
+    status.style.color = 'black';
+    resultsContainer.style.display = 'none';
+
+    try {
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!res.ok) throw new Error('Request failed');
+
+      const data = await res.json();
+
+      // Show table
+      tableHead.innerHTML = '';
+      const headerRow = document.createElement('tr');
+      data.headers.forEach(header => {
+        const th = document.createElement('th');
+        th.textContent = header;
+        headerRow.appendChild(th);
+      });
+      tableHead.appendChild(headerRow);
+
+      tableBody.innerHTML = '';
+      const qualStatusIndex = data.headers.findIndex(h =>
+        h.toLowerCase().includes('qualification status') || h.toLowerCase().includes('qualified status')
+      );
+
+      data.rows.forEach(row => {
+        const tr = document.createElement('tr');
+        row.forEach((cell, index) => {
+          const td = document.createElement('td');
+          td.textContent = cell;
+
+          if (index === qualStatusIndex) {
+            const cellText = cell.toLowerCase();
+            if (cellText.includes('qualified') && !cellText.includes('not')) {
+              td.style.backgroundColor = '#c6efce';
+              td.style.color = '#006100';
+            } else if (cellText.includes('not qualified')) {
+              td.style.backgroundColor = '#ffc7ce';
+              td.style.color = '#9c0006';
+            }
+          }
+          tr.appendChild(td);
+        });
+        tableBody.appendChild(tr);
+      });
+
+      resultsContainer.style.display = 'block';
+      downloadBtn.onclick = () => {
+        window.open(data.excel_download_url, '_blank');
+      };
+
+      status.innerText = 'Processing complete. Results shown below.';
+      status.style.color = 'green';
+    } catch (error) {
+      console.error('Error:', error);
+      status.innerText = 'An error occurred while processing.';
+      status.style.color = 'red';
+    } finally {
+      // Reset GIFs
+      loadingGif.style.display = 'none';
+      idleGif.style.display = 'none';
+    }
+  }
+</script>
+
 </body>
 </html>

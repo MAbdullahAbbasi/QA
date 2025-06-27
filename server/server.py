@@ -13,7 +13,7 @@ from werkzeug.utils import secure_filename
 
 # Setup Flask app
 template_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), 'templates'))
-app = Flask(__name__, template_folder=template_dir)
+app = Flask(__name__, template_folder=template_dir, static_folder='../static')
 
 EXPORT_FOLDER = os.path.join(os.getcwd(), 'exports')
 os.makedirs(EXPORT_FOLDER, exist_ok=True)
@@ -84,6 +84,59 @@ def process_folder():
         "rows": results,
         "excel_download_url": url_for('download_excel', filename=filename)
     })
+
+@app.route('/process_files', methods=['POST'])
+def process_files():
+    uploaded_files = request.files.getlist('audios')
+    if not uploaded_files:
+        return jsonify({"error": "No files uploaded"}), 400
+
+    questions = [
+        "What is the year make and model of your vehicle?",
+        "How many miles does your vehicle have",
+        "Can you spell your first and last name, please",
+        "In witch state do you currently reside",
+        "May I have your email address, please"
+    ]
+
+    headers = [
+        "File Name",
+        "Vehicle Info",
+        "Mileage",
+        "Full Name",
+        "State",
+        "Email",
+        "Qualification Status"
+    ]
+
+    results = []
+
+    for audio_file in uploaded_files:
+        filename = secure_filename(audio_file.filename)
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.wav') as temp_audio:
+            audio_file.save(temp_audio.name)
+            transcribed_text = audio_transcription(temp_audio.name)
+        os.remove(temp_audio.name)
+
+        prompt = build_prompt(transcribed_text, questions)
+        filtered_answers = resource_generation_gemini(prompt)
+        qualification = is_qualified_gemini(filtered_answers)
+
+        answers = [filtered_answers.get(q.lower(), '') for q in questions]
+        row = [filename] + [str(ans) if not isinstance(ans, str) else ans for ans in answers] + [str(qualification)]
+        results.append(row)
+
+    filename = f'results_{uuid.uuid4().hex}.xlsx'
+    excel_path = os.path.join(EXPORT_FOLDER, filename)
+    save_excel(headers, results, excel_path)
+
+    return jsonify({
+        "headers": headers,
+        "rows": results,
+        "excel_download_url": url_for('download_excel', filename=filename)
+    })
+
 
 @app.route('/download_excel/<filename>')
 def download_excel(filename):
