@@ -119,8 +119,8 @@ def audio_transcription(file_path):
         transcript = transcriber.transcribe(file_path)
         if transcript.error:
             return f"Transcription error: {transcript.error}"
-        else:
-            print("Transcribed Text: ", transcript)
+        # else:
+            # print("Transcribed Text: ", transcript)
         return transcript.text
     except Exception as e:
         return f"Transcription failed: {str(e)}"

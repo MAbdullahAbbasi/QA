@@ -2,31 +2,50 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet"
-    integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Batch Audio Upload</title>
+  <title>cTech QA Model</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet" />
 </head>
 <body>
-
   <div class="container my-4">
+    <h1 class="text-center display-4 mb-4" style="text-shadow: 0px 4px 6px rgba(255, 0, 191, 0.5);">cTech QA Model</h1>
+    <h3 class="text-center display-16 mb-4" style="font-weight: lighter;">Test the quality of your call with us</h3>
 
-    <h1 class="text-center display-3 mb-4">
-      Upload a Folder of Audio Files
-    </h1>
+    <hr style="height: 2px; border: none; background-color: black; box-shadow: 0 2px 5px rgba(0,0,0,0.5);">
 
-    <div class="input-group mb-3">
-      <input type="file" class="form-control" id="folderInput" webkitdirectory directory multiple />
-      <label class="input-group-text" for="folderInput">Upload</label>
+    <!-- Top Toggle Buttons -->
+    <div class="text-center mb-4">
+      <button id="showFolderUpload" class="btn btn-outline-primary me-2">Upload Folder</button>
+      <button id="showFileUpload" class="btn btn-outline-secondary">Upload Files</button>
     </div>
 
-    <div class="col-auto mb-3">
-      <button id="uploadBtn" class="btn btn-primary">Process Audios</button>
+
+
+    <!-- Folder Upload Section -->
+    <div id="folderSection" style="display: none;">
+      <div class="input-group mb-3">
+        <input type="file" class="form-control" id="folderInput" webkitdirectory directory multiple />
+        <label class="input-group-text" for="folderInput">Upload Folder</label>
+      </div>
+      <div class="col-auto mb-3">
+        <button id="uploadFolderBtn" class="btn btn-primary">Process Folder Audios</button>
+      </div>
+    </div>
+
+    <!-- File Upload Section -->
+    <div id="fileSection" style="display: none;">
+      <div class="input-group mb-3">
+        <input type="file" class="form-control" id="fileInput" multiple />
+        <label class="input-group-text" for="fileInput">Upload Files</label>
+      </div>
+      <div class="col-auto mb-3">
+        <button id="uploadFileBtn" class="btn btn-secondary">Process Files</button>
+      </div>
     </div>
 
     <div id="status" class="mb-3"></div>
 
-    <!-- Container for showing the table -->
+    <!-- Results Section -->
     <div id="resultsContainer" style="display:none;">
       <h3>Results:</h3>
       <div class="table-responsive">
@@ -37,22 +56,54 @@
       </div>
       <button id="downloadBtn" class="btn btn-success">Download Excel File</button>
     </div>
-
   </div>
 
   <script>
+    const folderSection = document.getElementById('folderSection');
+    const fileSection = document.getElementById('fileSection');
+    const showFolderUpload = document.getElementById('showFolderUpload');
+    const showFileUpload = document.getElementById('showFileUpload');
+
     const folderInput = document.getElementById('folderInput');
-    const uploadBtn = document.getElementById('uploadBtn');
+    const fileInput = document.getElementById('fileInput');
+    const uploadFolderBtn = document.getElementById('uploadFolderBtn');
+    const uploadFileBtn = document.getElementById('uploadFileBtn');
+
     const status = document.getElementById('status');
     const resultsContainer = document.getElementById('resultsContainer');
     const tableHead = document.getElementById('tableHead');
     const tableBody = document.getElementById('tableBody');
     const downloadBtn = document.getElementById('downloadBtn');
 
-    uploadBtn.addEventListener('click', async () => {
-      const files = folderInput.files;
+    // Toggle views
+    showFolderUpload.addEventListener('click', () => {
+      folderSection.style.display = 'block';
+      fileSection.style.display = 'none';
+      resultsContainer.style.display = 'none';
+      status.innerText = '';
+    });
+
+    showFileUpload.addEventListener('click', () => {
+      folderSection.style.display = 'none';
+      fileSection.style.display = 'block';
+      resultsContainer.style.display = 'none';
+      status.innerText = '';
+    });
+
+    // Handle folder upload
+    uploadFolderBtn.addEventListener('click', async () => {
+      await handleUpload(folderInput.files, '/process_folder');
+    });
+
+    // Handle file upload
+    uploadFileBtn.addEventListener('click', async () => {
+      await handleUpload(fileInput.files, '/process_files');
+    });
+
+    // Common handler
+    async function handleUpload(files, endpoint) {
       if (files.length === 0) {
-        status.innerText = 'Please select a folder.';
+        status.innerText = 'Please select files.';
         status.style.color = 'red';
         return;
       }
@@ -64,21 +115,19 @@
 
       status.innerText = 'Uploading and processing...';
       status.style.color = 'black';
-      resultsContainer.style.display = 'none';  // hide previous results
+      resultsContainer.style.display = 'none';
 
       try {
-        const res = await fetch('/process_folder', {
+        const res = await fetch(endpoint, {
           method: 'POST',
           body: formData,
         });
 
-        if (!res.ok) {
-          throw new Error('Request failed');
-        }
+        if (!res.ok) throw new Error('Request failed');
 
         const data = await res.json();
 
-        // Show table headers
+        // Show table
         tableHead.innerHTML = '';
         const headerRow = document.createElement('tr');
         data.headers.forEach(header => {
@@ -88,52 +137,45 @@
         });
         tableHead.appendChild(headerRow);
 
-        // Show table rows
         tableBody.innerHTML = '';
+        const qualStatusIndex = data.headers.findIndex(h =>
+          h.toLowerCase().includes('qualification status') || h.toLowerCase().includes('qualified status')
+        );
 
-        const qualStatusIndex = data.headers.findIndex(h => h.toLowerCase().includes('qualification status') || h.toLowerCase().includes('qualified status'));
+        data.rows.forEach(row => {
+          const tr = document.createElement('tr');
+          row.forEach((cell, index) => {
+            const td = document.createElement('td');
+            td.textContent = cell;
 
-data.rows.forEach(row => {
-  const tr = document.createElement('tr');
-  row.forEach((cell, index) => {
-    const td = document.createElement('td');
-    td.textContent = cell;
+            if (index === qualStatusIndex) {
+              const cellText = cell.toLowerCase();
+              if (cellText.includes('qualified') && !cellText.includes('not')) {
+                td.style.backgroundColor = '#c6efce';
+                td.style.color = '#006100';
+              } else if (cellText.includes('not qualified')) {
+                td.style.backgroundColor = '#ffc7ce';
+                td.style.color = '#9c0006';
+              }
+            }
+            tr.appendChild(td);
+          });
+          tableBody.appendChild(tr);
+        });
 
-    // Apply coloring based on Qualification Status
-    if (index === qualStatusIndex) {
-      const cellText = cell.toLowerCase();
-      if (cellText.includes('qualified') && !cellText.includes('not')) {
-        td.style.backgroundColor = '#c6efce'; // light green
-        td.style.color = '#006100'; // dark green text
-      } else if (cellText.includes('not qualified')) {
-        td.style.backgroundColor = '#ffc7ce'; // light red
-        td.style.color = '#9c0006'; // dark red text
-      }
-    }
-
-    tr.appendChild(td);
-  });
-  tableBody.appendChild(tr);
-});
-
-        // Show the results container
         resultsContainer.style.display = 'block';
-
-        // Setup the download button link
         downloadBtn.onclick = () => {
           window.open('http://127.0.0.1:5000' + data.excel_download_url, '_blank');
         };
 
         status.innerText = 'Processing complete. Results shown below.';
         status.style.color = 'green';
-
       } catch (error) {
         console.error('Error:', error);
         status.innerText = 'An error occurred while processing.';
         status.style.color = 'red';
       }
-    });
+    }
   </script>
-
 </body>
 </html>
