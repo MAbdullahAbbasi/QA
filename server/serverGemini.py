@@ -116,7 +116,7 @@ def is_qualified_gemini(answers):
                 - Email is optional: if missing, still proceed with Qualified if all other conditions are met.
                 """
 
-    prompt = prompt + "/nCall with Q/A: " + json.dumps(answers, indent=2)
+    prompt = instructions + "\nCall with Q/A: " + json.dumps(answers, indent=2)
     url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=AIzaSyC3akknXGbeuvAg_kBRkGsi586RuXeHkHo"
     headers = {"Content-Type": "application/json"}
     data = {

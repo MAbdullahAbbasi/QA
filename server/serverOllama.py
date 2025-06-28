@@ -5,8 +5,7 @@ from openpyxl import Workbook
 from openpyxl.styles import PatternFill
 import uuid
 import assemblyai as aai
-import google.generativeai as genai
-import requests
+import subprocess
 from io import BytesIO
 from werkzeug.utils import secure_filename
 from concurrent.futures import ThreadPoolExecutor
@@ -25,7 +24,6 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # API Keys
 aai.settings.api_key = "f2b25c07671e4d2cac25479469debcab"
-genai.configure(api_key="AIzaSyC3akknXGbeuvAg_kBRkGsi586RuXeHkHo")
 
 @app.route("/")
 def home():
@@ -60,26 +58,20 @@ Q4: [answer]
 Q5: [answer]
 """
 
-def resource_generation_gemini(prompt_text):
-    url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=AIzaSyC3akknXGbeuvAg_kBRkGsi586RuXeHkHo"
-    headers = {"Content-Type": "application/json"}
-    data = {
-        "contents": [{"parts": [{"text": prompt_text}]}]
-    }
+def call_ollama_model(prompt):
     try:
-        response = requests.post(url, headers=headers, json=data)
-        response.raise_for_status()
-        res_json = response.json()
-        candidates = res_json.get("candidates", [])
-        if candidates and "content" in candidates[0]:
-            parts = candidates[0]["content"].get("parts", [])
-            if parts:
-                raw_text = parts[0].get("text", "")
-                return parse_gemini_response(raw_text)
-        return {}
-    except requests.exceptions.RequestException as e:
-        print(f"Gemini API request failed: {e}")
-        return {}
+        result = subprocess.run([
+            "ollama", "run", "mistral"
+        ], input=prompt.encode(), capture_output=True, timeout=120)
+        output = result.stdout.decode().strip()
+        return output
+    except Exception as e:
+        print(f"Ollama call failed: {e}")
+        return ""
+
+def resource_generation_ollama(prompt_text):
+    raw_text = call_ollama_model(prompt_text)
+    return parse_gemini_response(raw_text)
 
 def parse_gemini_response(text):
     answers = {}
@@ -99,42 +91,23 @@ def parse_gemini_response(text):
             answers[questions_map.get(q_index, f"q{q_index+1}")] = answer
     return answers
 
-def is_qualified_gemini(answers):
-    prompt = """
-                You are given:
-                1. A script containing required questions and expected answers.
-                2. A set of customer responses.
+def is_qualified_ollama(answers):
+    instructions = """
+    You are given:
+    1. A script containing required questions and expected answers.
+    2. A set of customer responses.
 
-                Your task:
-                - Match each customer answer to the corresponding question in the script.
-                - If all questions have been answered as expected, respond: Qualified.
-                - If any question is missing or not properly answered, respond: Not Qualified followed by a short reason (4–5 words only).
-                - If multiple vehicles are mentioned, and at least one vehicle has complete information, respond: Qualified.
+    Your task:
+    - Match each customer answer to the corresponding question in the script.
+    - If all questions have been answered as expected, respond: Qualified.
+    - If any question is missing or not properly answered, respond: Not Qualified followed by a short reason (4-5 words only).
 
-                Important notes:
-                - If the agent skipped a question and the customer did not answer it, the result is Not Qualified.
-                - Email is optional: if missing, still proceed with Qualified if all other conditions are met.
-                """
-
-    prompt = prompt + "/nCall with Q/A: " + json.dumps(answers, indent=2)
-    url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=AIzaSyC3akknXGbeuvAg_kBRkGsi586RuXeHkHo"
-    headers = {"Content-Type": "application/json"}
-    data = {
-        "contents": [{"parts": [{"text": prompt}]}]
-    }
-    try:
-        response = requests.post(url, headers=headers, json=data)
-        response.raise_for_status()
-        res_json = response.json()
-        candidates = res_json.get("candidates", [])
-        if candidates and "content" in candidates[0]:
-            parts = candidates[0]["content"].get("parts", [])
-            if parts:
-                return parts[0].get("text", "")
-        return "Not Qualified: API Error"
-    except requests.exceptions.RequestException as e:
-        print(f"Gemini API request failed: {e}")
-        return "Not Qualified: Request Error"
+    Important notes:
+    - If the agent skipped a question and the customer did not answer it, the result is Not Qualified.
+    - Email is optional.
+    """
+    prompt = instructions + "\nCall with Q/A: " + json.dumps(answers, indent=2)
+    return call_ollama_model(prompt)
 
 def save_excel(headers, rows, path):
     wb = Workbook()
@@ -162,8 +135,8 @@ def process_audio_file(audio_file, questions):
     os.remove(temp_audio.name)
 
     prompt = build_prompt(transcribed_text, questions)
-    filtered_answers = resource_generation_gemini(prompt)
-    qualification = is_qualified_gemini(filtered_answers)
+    filtered_answers = resource_generation_ollama(prompt)
+    qualification = is_qualified_ollama(filtered_answers)
     answers = [filtered_answers.get(q.lower(), '') for q in questions]
     return [filename] + answers + [qualification]
 
